@@ -36,7 +36,7 @@ $(version_mandocs): package.json
 
 htmldocs: dev-deps
 	node bin/npm-cli.js rebuild
-	cd docs && node dockhand.js >&2
+	node bin/npm-cli.js run -w docs build
 
 clean: docs-clean gitclean
 
@@ -73,8 +73,14 @@ man/man7/%.7: docs/content/using-npm/%.md scripts/docs-build.js
 docs/content/using-npm/config.md: scripts/config-doc.js lib/utils/config/*.js
 	node scripts/config-doc.js
 
+docs/content/commands/npm-%.md: lib/%.js scripts/config-doc-command.js lib/utils/config/*.js
+	node scripts/config-doc-command.js $@ $<
+
 test: dev-deps
 	node bin/npm-cli.js test
+
+smoke-tests: dev-deps
+	node bin/npm-cli.js run smoke-tests -- --no-check-coverage
 
 ls-ok:
 	node . ls --production >/dev/null
@@ -89,11 +95,12 @@ link: uninstall
 	node bin/npm-cli.js link -f --ignore-scripts
 
 prune:
+	node bin/npm-cli.js run resetdeps
 	node bin/npm-cli.js prune --production --no-save --no-audit
 	@[[ "$(shell git status -s)" != "" ]] && echo "ERR: found unpruned files" && exit 1 || echo "git status is clean"
 
 
-publish: gitclean ls-ok link test docs prune
+publish: gitclean ls-ok link test smoke-tests docs prune
 	@git push origin :v$(shell node bin/npm-cli.js --no-timing -v) 2>&1 || true
 	git push origin $(BRANCH) &&\
 	git push origin --tags &&\
